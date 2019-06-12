@@ -8,5 +8,20 @@
 	},
 	"name": "CryptCheck",
 	"description": "Checks that incoming mail follows encryption protocol, and sends a mean note to the sender if protocol is broken.",
-	"version": "2.0"
+	"version": "2.0",
+	"content_security_policy": "default-src 'self'",
+	"icons":{
+		"64": "images/crypt.png",
+		"32": "images/crypt-32px.png",
+		"16": "images/crypt-64px.png"
+	},
+
+	"permissions":[
+		"*://developer.mozilla.org/*"
+		//"accountsFolders"
+	],
+
+	"background":{
+			"scripts": ["chrome/content/cryptcheck.js"]
+	}
 }
