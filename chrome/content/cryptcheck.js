@@ -48,6 +48,10 @@
 * Also:
 * - add whitelist functionality
 */
+/*
+var { Cc } = require("chrome");
+var clazz = Cc["@mozilla.org/messenger;1"];
+*/
 
 console.log('CryptCheck: running');
 
@@ -58,8 +62,8 @@ console.log('CryptCheck: running');
 	 */
 	console.log('CryptCheck: main function running');
 	// Querying mime conversion interface
-	var mimeConvert = Components.classes["@mozilla.org/messenger/mimeconverter;1"]
-	     .getService(Components.interfaces.nsIMimeConverter);
+	//var mimeConvert = Components.classes["@mozilla.org/messenger/mimeconverter;1"]
+	   //  .getService(Components.interfaces.nsIMimeConverter);
 
 	//function to determine encryption+use cases ("main")
 	//TODO: graph this function + helper functions out
@@ -78,21 +82,23 @@ console.log('CryptCheck: running');
 	 */
 
 	//returns boolean is encrypted or no
-	function encryptedFilter(/*something*/)
+	function isEncrypted(msgHdr)
 		{
 
 
 		}
 
 	//returns boolean is point3 address or no
-	//TODO: for general use, figure out how to not hardcode this
-	function addressFilter(/*something*/)
+	//TODO: for general use, figure out how to not hardcode thistt
+
+
+	function addressFilter(msgHdr)
 		{
 
 		}
 
 	//returns bool of whether recipient has senders public key or not
-	//this should affect the message semnt: aka why it broke protocol
+	//this should affect the message sent: aka why it broke protocol
 	//how do we access key list?
 	function hasPublicKey(/*something*/)
 		{
@@ -107,11 +113,42 @@ console.log('CryptCheck: running');
 
 	//	TEMP: TO SATISFY COMPILER
 
+	/*
+	 * The following code detects unread messages utilizing the messages api
+	 * available in the thunderbird beta release, which should go live around 
+	 * 3rd quarter 2019. Backwards compatability is little to none, so we'll
+	 * see how this goes.
+	 */
+
+	 function getUnreadMessages(inbox) //should this be a var?
+	 	{
+	 		//from messageList api doc page
+	 		//var folder = listMessages()
+	 		console.log('CryptCheck: whaddup ');
+	 		async function* listMessages(MailFolder) {
+			  let page = await browser.messages.list(folder);
+			  for (let message of page.messages) {
+			    yield message;
+			  }
+
+			  while (page.id) {
+			    page = await browser.messages.continueList(page.id);
+			    for (let message of page.messages) {
+			      yield message;
+			    }
+			  }
+			}
+	 	}
+
+
+
+
 	//from capkiller-> detect incoming messages (maybe)
 	window.addEventListener('load', function()
 		{
 		console.log('CryptCheck: add event listener');
 		// Localized strings
+		getUnreadMessages();
 		var stringsObj = document.getElementById("cryptcheck-strings");
 		// Creating a filter for exisiting messages
 		//what? is this going to ping every user on startup? it seems more useful to only iterate over
@@ -119,13 +156,15 @@ console.log('CryptCheck: running');
 		var cryptCheck =
 			{
 			id: "cryptcheck@point3.net", // Adding a name
-			name: stringsObj["name"], // Adding the name of the filter
+			name: "name", // Adding the name of the filter
 			//???
 			apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
 				{
 				for (var i = 0; i < aMsgHdrs.length; i++)
 					{
-					var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);
+					console.log('CryptCheck: boop');
+
+					//var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);
 					//replace with address
 					//msgHdr.subject = subjectFilter(msgHdr.subject);
 					}
@@ -151,13 +190,14 @@ console.log('CryptCheck: running');
 
 
 		// add filter action to filter action list
-		let filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
-		.getService(Components.interfaces.nsIMsgFilterService);
-		filterService.addCustomAction(cryptCheck);
+		//let filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
+		//.getService(Components.interfaces.nsIMsgFilterService);
+		//filterService.addCustomAction(cryptCheck);
 		/* Debug
 		consoleService.logStringMessage('CapsKiller: Filter added');//*/
 		// Listening for new mails
 
+		console.log('CryptCheck: got here');
 
 		var newMailListener =
 			{
@@ -167,7 +207,10 @@ console.log('CryptCheck: running');
 					{
 					console.log('CryptCheck: new message found');
 					//new mail, CHANGE to get address
-					msgHdr.subject = subjectFilter(msgHdr.subject);
+					if (!isEncrypted(msgHdr)){
+						console.log('CryptCheck: unencrypted message recieved');
+
+					}
 					//bodyFilter(msgHdr);
 					}
 				/* Debug
@@ -175,10 +218,13 @@ console.log('CryptCheck: running');
 				}
 			};
 
-		var notificationService =
-		Components.classes["@mozilla.org/messenger/msgnotificationservice;1"]
-			.getService(Components.interfaces.nsIMsgFolderNotificationService);
-		notificationService.addListener(newMailListener, notificationService.msgAdded);
+			console.log('CryptCheck: got down here');
+
+
+		//var notificationService =
+		//Components.classes["@mozilla.org/messenger/msgnotificationservice;1"]
+		//	.getService(Components.interfaces.nsIMsgFolderNotificationService);
+		//notificationService.addListener(newMailListener, notificationService.msgAdded);
 		/* Debug
 		consoleService.logStringMessage('CapsKiller: New messages listener added');//*/
 
