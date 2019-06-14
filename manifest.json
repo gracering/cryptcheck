@@ -17,8 +17,9 @@
 	},
 
 	"permissions":[
-		"*://developer.mozilla.org/*"
-		//"accountsFolders"
+		//"*://developer.mozilla.org/*"
+		"menus",
+		"messagesRead"
 	],
 
 	"background":{
