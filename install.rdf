@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+
+  <Description about="urn:mozilla:install-manifest">
+    <em:id>{8845E3B3-E8FB-40E2-95E9-EC40294818C4}</em:id>
+    <em:type>2</em:type> <!-- type=extension --> 
+    <em:name>cryptcheck</em:name>
+    <em:version>1.0</em:version>
+    <em:unpack>true</em:unpack>
+    <em:description>Checks that incoming mail follows encryption protocol, and sends a mean note to the sender if protocol is broken.</em:description>
+    <em:creator>Grace Ring</em:creator>
+    <em:contributor>Creators of the quick-text extension, used as reference for source code</em:contributor>
+    <em:optionsURL>chrome://cryptcheck/content/settings.xul</em:optionsURL>
+    <em:iconURL>chrome://cryptcheck/skin/icon.png</em:iconURL>
+    <em:homepageURL>https://github.com/gracering/cryptcheck/</em:homepageURL>
+
+    <!-- Thunderbird -->
+    <em:targetApplication>
+      <Description>
+        <em:id>{3550f703-e582-4d05-9a08-453d09bdfdc6}</em:id>
+        <em:minVersion>60.0</em:minVersion>
+        <em:maxVersion>67.*</em:maxVersion>
+      </Description>
+    </em:targetApplication>
+  </Description>
+</RDF>
