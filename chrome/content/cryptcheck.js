@@ -3,33 +3,34 @@
 * 1. messge detection -> scan for incoming message/hang onto alert
 * 2. messge parsing -> parse new message to see if it's encrypted
 * 		a) in message header: info about pgp encryption
-		ex: encrypted message
-			Content-Type: multipart/encrypted;
-			 protocol="application/pgp-encrypted";
-			 boundary="FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw"
+	ex: encrypted message
+		Content-Type: multipart/encrypted;
+		 protocol="application/pgp-encrypted";
+		 boundary="FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw"
 
-			This is an OpenPGP/MIME encrypted message (RFC 4880 and 3156)
-			--FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw
-			Content-Type: application/pgp-encrypted
-			Content-Description: PGP/MIME version identification
+		This is an OpenPGP/MIME encrypted message (RFC 4880 and 3156)
+		--FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw
+		Content-Type: application/pgp-encrypted
+		Content-Description: PGP/MIME version identification
 
- 		ex: unencrypted message
- 			Content-Type: multipart/alternative;
-			 boundary="------------AC8AB5A1F2824CB90CC05A3D"
-			Content-Language: en-US
+		ex: unencrypted message
+			Content-Type: multipart/alternative;
+		 boundary="------------AC8AB5A1F2824CB90CC05A3D"
+		Content-Language: en-US
 
-			This is a multi-part message in MIME format.
-			--------------AC8AB5A1F2824CB90CC05A3D
-			Content-Type: text/plain; charset=utf-8
-			Content-Transfer-Encoding: 7bit
+		This is a multi-part message in MIME format.
+		--------------AC8AB5A1F2824CB90CC05A3D
+		Content-Type: text/plain; charset=utf-8
+		Content-Transfer-Encoding: 7bit
 * 		
 * 3. check encryption against protocol to determine if auto-reply should be sent
 *		a) sender is point3 address
 *			i) email is not forwarded -> proceed to 5
 *			ii) email is forwarded -> end process for this email
-				ex: X-Forwarded-Message-Id: <129711b9-bebc-f135-8c94-2701cec696f7@gmail.com>
-				    not-forwarded messages wont have this field
-			iii) what about messages with multiple recipients?
+			ex: X-Forwarded-Message-Id: <129711b9-bebc-f135-8c94-2701cec696f7@gmail.com>
+			    not-forwarded messages wont have this field
+		iii) mean email has not already been sent
+		iv) what about messages with multiple recipients?
 *		b) recipient has public key of sender (how do we access this data)?
 *		c) else end process
 * 5. record result -> where should this be stored?
@@ -43,168 +44,191 @@
 * 2. minimize connection between content of email and function of cryptcheck
 * 3. ensure that tampered metadata doesn't result in email being sent to the wrong address
 * 4. in use case where no action is taken, make sure input cannot be manipulated/function doesnt
-* do anything unintened (attackers most likely to come from these channels)
+* do anything unintended 
 * 
 * Also:
-* - add whitelist functionalitys
-/*
-var { Cc } = require("chrome");
-var clazz = Cc["@mozilla.org/messenger;1"];
+* - add whitelist functionality
+* - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
 */
 
 console.log('CryptCheck: running');
 
-//start->javascript has self-declaring anon functions 
-(function(){
-	
-	console.log('CryptCheck: main function running');
-	// Querying mime conversion interface
-	//var mimeConvert = Components.classes["@mozilla.org/messenger/mimeconverter;1"]
-	   //  .getService(Components.interfaces.nsIMimeConverter);
 
-	//function to determine encryption+use cases ("main")
-	//TODO: graph this function + helper functions out
-	function cryptCheck(/*something*/) //change later: enncrypted vs unencrypted bool? or string metadata?
+//browser.browserAction.enable();
+
+// Querying mime conversion interface
+//var mimeConvert = Components.clases["@mozilla.org/messenger/mimeconverter;1"]
+   //  .getService(Components.interfaces.nsIMimeConverter);
+
+//function to determine encryption+use cases ("main")
+
+//defining inocoming mail object -> potentially change this name bc right now I'm 
+//not really sure what anything does
+if (typeof(IncomingMail) == "undefined"){
+	var IncomingMail = {}
+}
+
+//interface query function (what does this do?)
+//adapted from mailboxalert
+IncomingMail.getInterface = function (item, iff){
+	var interface = item.QueryInterface(iff);
+	return interface;
+}
+
+
+IncomingMail.filter_action =
+	{
+	id: "cryptcheck@point3.net#filter", // Adding a name
+	name: "CryptCheck", // Adding the name of the filter
+	//???
+	apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
 		{
-
-
-
-		}
-
-
-	/*
-	 *
-	 * most of these functions can probably use or be replaced by stdlib headerutils
-	 *
-	 */
-
-	//returns boolean is encrypted or no
-	function isEncrypted(msgHdr)
-		{
-
-
-		}
-
-	//returns boolean is point3 address or no
-	//TODO: for general use, figure out how to not hardcode thistt
-
-
-	function addressFilter(msgHdr)
-		{
-
-		}
-
-	//returns bool of whether recipient has senders public key or not
-	//this should affect the message sent: aka why it broke protocol
-	//how do we access key list?
-	function hasPublicKey(/*something*/)
-		{
-
-		}
-
-	//return if forwarded or not
-	function isForwarded(/*something*/)
-		{
-
-		}
-
-
-	/*
-	 * The following code detects unread messages utilizing the messages api
-	 * available in the thunderbird beta release, which should go live around 
-	 * 3rd quarter 2019. Backwards compatability is little to none, so we'll
-	 * see how this goes.
-	 */
-
-	 function getUnreadMessages(inbox) //should this be a var?
-	 	{
-	 		//from messageList api doc page
-	 		//var folder = listMessages()
-	 		console.log('CryptCheck: whaddup ');
-	 		
-	 	}
-
-
-
-
-	//from capkiller-> detect incoming messages (maybe)
-	window.addEventListener('load', function()
-		{
-		console.log('CryptCheck: add event listener');
-		// Localized strings
-		getUnreadMessages();
-		var stringsObj = document.getElementById("cryptcheck-strings");
-		// Creating a filter for exisiting messages
-		//what? is this going to ping every user on startup? it seems more useful to only iterate over
-		//unread messages/uncoming messages
-		var cryptCheck =
+		for (var i = 0; i < aMsgHdrs.length; i++)
 			{
-			id: "cryptcheck@point3.net", // Adding a name
-			name: "name", // Adding the name of the filter
-			//???
-			apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
+			var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
+				if (!msgHdr.isRead)
 				{
-				for (var i = 0; i < aMsgHdrs.length; i++)
-					{
-					console.log('CryptCheck: boop');
-
-					//var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);
-					//replace with address
-					//msgHdr.subject = subjectFilter(msgHdr.subject);
-					}
-				/* Debug
-				consoleService.logStringMessage('CapsKiller: Filter applied');//*/
-				},
-			isValidForType: function(type, scope)
-				{
-				/* Debug
-				consoleService.logStringMessage('CapsKiller: Filter validated. Type: '+type+'.');//*/
-				return true;
-				}, // all
-			validateActionValue: function(value, folder, type)
-				{
-				/* Debug
-				consoleService.logStringMessage('CapsKiller: dunno what it does');//*/
-				return null;
-				},
-			allowDuplicates: true,
-			needsBody: false //removed comma here
-			};
-
-
-
-		// add filter action to filter action list
-		//let filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
-		//.getService(Components.interfaces.nsIMsgFilterService);
-		//filterService.addCustomAction(cryptCheck);
-		/* Debug
-		consoleService.logStringMessage('CapsKiller: Filter added');//*/
-		// Listening for new mails
-
-		console.log('CryptCheck: got here');
-
-		var newMailListener =
-			{
-			msgAdded: function(msgHdr)
-				{
-				if(!msgHdr.isRead)
-					{
-					console.log('CryptCheck: new message found');
-					//new mail, CHANGE to get address
-					if (!isEncrypted(msgHdr)){
-						console.log('CryptCheck: unencrypted message recieved');
-
-					}
-					//bodyFilter(msgHdr);
-					}
-				/* Debug
-				consoleService.logStringMessage('CapsKiller: Filter applied to new messages');//*/
+					console.log('log from filter action');
+					//use data from msgHdr to create the new message/alert?
+					//pass to logic determining address, encryptd, etc
 				}
-			};
+			}
+		},
+	isValidForType: function(type, scope)
+		{
 
-			console.log('CryptCheck: got down here');
+		return true;
+		}, 
+	validateActionValue: function(value, folder, type)
+		{
+		//??????
+		return null;
+		},
+	allowDuplicates: true,
+	needsBody: false //maybe
+	};
 
-		},false);
-	})();
+	/*
+	 * Might need to add some folder get methods here (see mailboxalert_vars.js, lines 600+). Not
+	 * sure why or how they might plug in, but it's worth noting.
+	 */
+
+console.log('CryptCheck: got here');
 
 
+IncomingMail.getFolder = function()
+{
+	try
+	{
+		var folderResource = GetFirstSelectedMsgFolder(); //do we need to define this function?
+		if (folderResource){
+			var msgFolder = IncomingMail.getInterface(folderResource, Components.interfaces.nsIMsgFolder);
+			return msgFolder;
+		}
+	} catch{
+		console.log('something bad happened in IncomingMail.getFolder');
+	}
+	return null;
+}
+
+
+IncomingMail.FolderListener = function(){}
+
+IncomingMail.FolderListener.prototype = 
+{
+	OnItemAdded: function(parentItem, item) //?
+	{
+        const MSG_FOLDER_FLAG_OFFLINE = 0x8000000; //????
+        var folder = IncomingMail.getInterface(parentItem, Components.interfaces.nsIMsgFolder);
+        var message;
+        try{
+        	item.QueryInterface(Components.interfaces.nsIMsgDBHdr, message);
+        	//do thing here, I think.
+        	console.log('inside the listener -> item added');
+        } catch {
+        	console.log('something bad happened inside folderlistener');
+        }
+	}
+}
+
+IncomingMail.onLoad = function ()
+{
+	removeEventListener("load", IncomingMail.onLoad, true);
+	Components.classes["@mozilla.org/messenger/services/session;1"]
+	    .getService(Components.interfaces.nsIMsgMailSession)
+	    .AddFolderListener(new IncomingMail.FolderListener(),
+	    Components.interfaces.nsIFolderListener.all);
+
+    var filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
+                    .getService(Components.interfaces.nsIMsgFilterService); //idk what this does
+    filterService.addCustomAction(IncomingMail.filter_action);
+    //do we have to re-add a listener here?
+}
+
+//adds folder listener
+addEventListener("load", IncomingMail.onLoad, true);
+
+
+//logic functions
+
+function cryptCheck(/*something*/) //change later: enncrypted vs unencrypted bool? or string metadata?
+	{
+
+
+
+	}
+
+
+/*
+ *
+ * most of these functions can probably use or be replaced by stdlib headerutils
+ *
+ */
+
+//returns boolean is encrypted or no
+function isEncrypted(msgHdr)
+	{
+
+
+	}
+
+//returns boolean is point3 address or no
+//TODO: for general use, figure out how to not hardcode thistt
+
+
+function addressFilter(msgHdr)
+	{
+
+	}
+
+//returns bool of whether recipient has senders public key or not
+//this should affect the message sent: aka why it broke protocol
+//how do we access key list?
+function hasPublicKey(/*something*/)
+	{
+
+	}
+
+//return if forwarded or not
+function isForwarded(/*something*/)
+	{
+
+	}
+
+ 
+ /*
+	  * This creates the message that is sent to whoever broke protocol. At this
+	  * point in code flow, it has already worked through the logic to determine
+	  * whether the message is bad or not, so any msgHdr that comes in is verified 
+	  * bad. It might have to be sent manually, but this should at least create the 
+	  * message.
+  */
+
+
+ function composeAutoReply(msgHdr){
+ 	var composeParams;
+ 	composeParams.to = msgHdr.author;
+ 	composeParams.body = "This is an automatically generated email to let you know you should have encrypted your email sent to [RECIPIENT] at [TIME AND DATE]. If you think this email is a mistake, please let grace@point3.net know.";
+ 	browser.beginNew(composeParams);
+
+ }
