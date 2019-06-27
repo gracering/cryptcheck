@@ -16,7 +16,7 @@
 		ex: unencrypted message
 			Content-Type: multipart/alternative;
 		 boundary="------------AC8AB5A1F2824CB90CC05A3D"
-		Content-Language: en-US
+		Content-Language: en-USmsgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
 
 		This is a multi-part message in MIME format.
 		--------------AC8AB5A1F2824CB90CC05A3D
@@ -29,14 +29,14 @@
 *			ii) email is forwarded -> end process for this email
 			ex: X-Forwarded-Message-Id: <129711b9-bebc-f135-8c94-2701cec696f7@gmail.com>
 			    not-forwarded messages wont have this field
-		iii) mean email has not already been sent
-		iv) what about messages with multiple recipients?
+			iii) mean email has not already been sent
+			iv) what about messages with multiple recipients?
 *		b) recipient has public key of sender (how do we access this data)?
 *		c) else end process
 * 5. record result -> where should this be stored?
 *		a) create file in thunderbird source files? hook up to database? later
 * 4. compose new message with appropriate information/"you messsed up" message
-* 5. send message to sender 
+* 5. send message to sender -> it looks like we'll need the tbirdstdlib funcs for this
 * 6. alert end user that a message was sent (attach alert/generate new message?)
 *
 * Once basic codework is complete, go through and add security features before debugging:
@@ -49,6 +49,7 @@
 * Also:
 * - add whitelist functionality
 * - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
+* - add formal documentation
 */
 
 console.log('CryptCheck: running');
@@ -78,11 +79,13 @@ IncomingMail.getInterface = function (item, iff){
 
 IncomingMail.filter_action =
 	{
+
 	id: "cryptcheck@point3.net#filter", // Adding a name
 	name: "CryptCheck", // Adding the name of the filter
 	//???
 	apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
 		{
+		console.log('something bad happened inside folderlistener');
 		for (var i = 0; i < aMsgHdrs.length; i++)
 			{
 			var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
@@ -143,8 +146,35 @@ IncomingMail.FolderListener.prototype =
         var message;
         try{
         	item.QueryInterface(Components.interfaces.nsIMsgDBHdr, message);
-        	//do thing here, I think.
         	console.log('inside the listener -> item added');
+        	/*
+        	 * streams the message header and searches for content-type
+        	 * TODO move this into it's own function
+        	 * code courtesy of morat from mozillazine
+        	 */ 
+        	 
+        	var msgHdr = gFolderDisplay.selectedMessage;
+			var msgUri = msgHdr.folder.getUriForMsg(msgHdr);
+			var msgService = messenger.messageServiceFromURI(msgUri);
+			var scriptableInputStream = Components.classes["@mozilla.org/scriptableinputstream;1"].
+			  createInstance(Components.interfaces.nsIScriptableInputStream);
+			var syncStreamListener = Components.classes["@mozilla.org/network/sync-stream-listener;1"].
+			  createInstance(Components.interfaces.nsISyncStreamListener);
+			scriptableInputStream.init(syncStreamListener);
+			var messageUri = msgService.streamHeaders(msgUri, syncStreamListener, null /*urlListener*/);
+			var data = new String();
+			var count = scriptableInputStream.available();
+			while (count) {
+			  data = data + scriptableInputStream.read(count);
+			  count = scriptableInputStream.available();
+			}
+			scriptableInputStream.close();
+			var re = new RegExp("Content-Type: (.*)");
+			var m = data.match(re);
+			var type = m && m[1];
+			cryptCheck(type, msgHdr);//msgHdr might actually be item
+
+
         } catch {
         	console.log('something bad happened inside folderlistener');
         }
@@ -153,6 +183,7 @@ IncomingMail.FolderListener.prototype =
 
 IncomingMail.onLoad = function ()
 {
+	console.log('onload function');
 	removeEventListener("load", IncomingMail.onLoad, true);
 	Components.classes["@mozilla.org/messenger/services/session;1"]
 	    .getService(Components.interfaces.nsIMsgMailSession)
@@ -170,12 +201,11 @@ addEventListener("load", IncomingMail.onLoad, true);
 
 
 //logic functions
-
-function cryptCheck(/*something*/) //change later: enncrypted vs unencrypted bool? or string metadata?
+//type: regexed content-type expression
+//msgHdr: returned DBMsgHdr
+function cryptCheck(type, msgHdr) //change later: enncrypted vs unencrypted bool? or string metadata?
 	{
-
-
-
+			
 	}
 
 
@@ -186,6 +216,8 @@ function cryptCheck(/*something*/) //change later: enncrypted vs unencrypted boo
  */
 
 //returns boolean is encrypted or no
+//ideally, this would be the first function called from cryptcheck
+//and perform the functions currently in the message listener
 function isEncrypted(msgHdr)
 	{
 
