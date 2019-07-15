@@ -50,6 +50,9 @@
 * - add whitelist functionality
 * - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
 * - add formal documentation
+* - case where email sent to self renders infinite loop
+* - should these emails be encrypted?
+* - messages that come in when thunderbird isn't up/on
 */
 
 console.log('CryptCheck: running');
@@ -79,19 +82,19 @@ IncomingMail.getInterface = function (item, iff){
 
 IncomingMail.filter_action =
 	{
-
 	id: "cryptcheck@point3.net#filter", // Adding a name
 	name: "CryptCheck", // Adding the name of the filter
 	//???
 	apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
 		{
-		console.log('something bad happened inside folderlistener');
+		console.log('log from filter action');
 		for (var i = 0; i < aMsgHdrs.length; i++)
 			{
-			var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
+				console.log('inside filter if statememt');
+				var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
 				if (!msgHdr.isRead)
 				{
-					console.log('log from filter action');
+					console.log('inside filter if statememt');
 					//use data from msgHdr to create the new message/alert?
 					//pass to logic determining address, encryptd, etc
 				}
@@ -144,40 +147,77 @@ IncomingMail.FolderListener.prototype =
         const MSG_FOLDER_FLAG_OFFLINE = 0x8000000; //????
         var folder = IncomingMail.getInterface(parentItem, Components.interfaces.nsIMsgFolder);
         var message;
-        try{
+        //console.log(folder.name);
+        //is folder parentItem here
+        console.log(parentItem.name);
+        
+        if (parentItem.name == "Inbox"){
+        //	try{
+
         	item.QueryInterface(Components.interfaces.nsIMsgDBHdr, message);
-        	console.log('inside the listener -> item added');
+        	var incomingMsgHdr = item.QueryInterface(Components.interfaces.nsIMsgDBHdr);
+        	console.log(incomingMsgHdr);
         	/*
         	 * streams the message header and searches for content-type
         	 * TODO move this into it's own function
         	 * code courtesy of morat from mozillazine
         	 */ 
-        	 
+        	//console.log(message);
+
+        	
+        	gFolderDisplay.selectMessage(incomingMsgHdr);
         	var msgHdr = gFolderDisplay.selectedMessage;
+
+        	console.log(msgHdr);
+        	
 			var msgUri = msgHdr.folder.getUriForMsg(msgHdr);
+			console.log(msgUri);
+			
 			var msgService = messenger.messageServiceFromURI(msgUri);
 			var scriptableInputStream = Components.classes["@mozilla.org/scriptableinputstream;1"].
 			  createInstance(Components.interfaces.nsIScriptableInputStream);
 			var syncStreamListener = Components.classes["@mozilla.org/network/sync-stream-listener;1"].
 			  createInstance(Components.interfaces.nsISyncStreamListener);
-			scriptableInputStream.init(syncStreamListener);
+			scriptableInputStream.init(syncStreamListener.inputStream);
 			var messageUri = msgService.streamHeaders(msgUri, syncStreamListener, null /*urlListener*/);
 			var data = new String();
-			var count = scriptableInputStream.available();
-			while (count) {
-			  data = data + scriptableInputStream.read(count);
-			  count = scriptableInputStream.available();
-			}
+
+			// this is the line that breaks it
+			// I'm assuming this is because it times out before it reaches the 'end'
+			// of the stream, although im not sure if its an issue with the data type
+			// (selected message and the components function seem to return slightly 
+			// different versions of the header variable) or if the variable is null
+			// or something like that, which it sometimes pops out as. its probably 
+			// possible to get around this specific syntax by using another EOF detection
+			// implementation, but the issue is most likely with the value of the 'header'
+			// variable itself. 
+			//var count = scriptableInputStream.available();
+
+			//while (count) {
+			//	data = data + scriptableInputStream.read(count);
+			//	count = scriptableInputStream.available();
+			//} 
+			console.log('before stream');
+			const MAX_MESSAGE_LENGTH = 65536;
+			var data = scriptableInputStream.read(MAX_MESSAGE_LENGTH);
+			console.log('after stream');
+
+
+
+			var type = " ";
 			scriptableInputStream.close();
 			var re = new RegExp("Content-Type: (.*)");
 			var m = data.match(re);
 			var type = m && m[1];
 			cryptCheck(type, msgHdr);//msgHdr might actually be item
+			
+			console.log('end listener');
+		
 
-
-        } catch {
-        	console.log('something bad happened inside folderlistener');
-        }
+       // } catch (e) {
+       //		console.log(e);
+       //	}
+       }
 	}
 }
 
@@ -204,34 +244,50 @@ addEventListener("load", IncomingMail.onLoad, true);
 //type: regexed content-type expression
 //msgHdr: returned DBMsgHdr
 function cryptCheck(type, msgHdr) //change later: enncrypted vs unencrypted bool? or string metadata?
-	{
-			
+	{ 
+		//hard coded for now--eventually, this should be changeable in settings
+		//TODO: fix hard coded company name
+		console.log('cryptcheck function');
+		var why = "";
+		//TODO: implement array of whitelisted addresses to be editable in settings. for now:
+		var whitelist = ["customersupport@point3.net", "info@point3.net"];
+		var companyDomain = "@point3.net";
+		if (isEncrypted(type)){
+			console.log("encrypted message recieved");
+			return false;
+		}
+		console.log("unencrypted message recieved");
+		//checks for company address
+		if (!msgHdr.mime2DecodedAuthor.includes(companyDomain)){ 
+			return false;
+		}
+		//TODO: check w/ enigmail to see if we have recipients public key		
+		//TODO: access forward or not in header data-> make this a preference?
+		if (msgHdr.mime2DecodedSubject.includes("Fwd:")){
+			return false;
+		}
+		var i = 0;
+		while (i < whitelist.length){
+			if (msgHdr.mime2DecodedAuthor.includes(whitelist[i])){
+				return false;
+			}else{
+				i++;
+			}
+		}
+
+		//msg breaks protocol
+		composeAutoReply(msgHdr);
 	}
 
-
-/*
- *
- * most of these functions can probably use or be replaced by stdlib headerutils
- *
- */
-
-//returns boolean is encrypted or no
-//ideally, this would be the first function called from cryptcheck
-//and perform the functions currently in the message listener
-function isEncrypted(msgHdr)
+function isEncrypted(type)
 	{
-
-
+		
+		type = type.toString();
+		console.log(type);
+		return type.includes("encrypted");
+		
 	}
 
-//returns boolean is point3 address or no
-//TODO: for general use, figure out how to not hardcode thistt
-
-
-function addressFilter(msgHdr)
-	{
-
-	}
 
 //returns bool of whether recipient has senders public key or not
 //this should affect the message sent: aka why it broke protocol
@@ -258,9 +314,22 @@ function isForwarded(/*something*/)
 
 
  function composeAutoReply(msgHdr){
+ 	var composeParams = {};
+ 	var recipients = msgHdr.mime2DecodedRecipients;
+ 	var inSub = msgHdr.mime2DecodedSubject;
  	var composeParams;
- 	composeParams.to = msgHdr.author;
- 	composeParams.body = "This is an automatically generated email to let you know you should have encrypted your email sent to [RECIPIENT] at [TIME AND DATE]. If you think this email is a mistake, please let grace@point3.net know.";
- 	browser.beginNew(composeParams);
+ 	composeParams.to = msgHdr.mime2DecodedAuthor;
+ 	//TODO: add date and time
+ 	//TODO: make this more formal/prettier
+ 	composeParams.body = 
+ 	"This is an automatically generated nastygram to let you know you should have encrypted your email "
+ 		+ '\"' + inSub + '\"'
+ 		+ " sent to " + recipients + ". This is a security company, for Turing's sake!" 
+ 		+ '\n' + "-CryptBot"
+ 		+ '\n' + '\n' + "P.S. This is an automatically composed email sent by the Thunderbird CryptCheck extension. "
+ 		+ "If you think this email is a mistake, please let grace at point3 dot net know.";
+ //	browser.beginNew(composeParams);
+	// console.log(composeParams.body);
 
  }
+ 
