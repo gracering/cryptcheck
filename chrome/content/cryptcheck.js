@@ -50,26 +50,43 @@
 * - add whitelist functionality
 * - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
 * - add formal documentation
+* - case where email sent to self renders infinite loop
+* - should these emails be encrypted?
+* - messages that come in when thunderbird isn't up/on
+* - checking for a message thread?
 */
 
 console.log('CryptCheck: running');
 
-
-//browser.browserAction.enable();
-
-// Querying mime conversion interface
-//var mimeConvert = Components.clases["@mozilla.org/messenger/mimeconverter;1"]
-   //  .getService(Components.interfaces.nsIMimeConverter);
-
-//function to determine encryption+use cases ("main")
-
-//defining inocoming mail object -> potentially change this name bc right now I'm 
-//not really sure what anything does
+//TODO: it might be a good idea to pop these in their own file (see: mail alert vars)
+//defining inocoming mail object
 if (typeof(IncomingMail) == "undefined"){
 	var IncomingMail = {}
 }
 
-//interface query function (what does this do?)
+IncomingMail.messageQueue = {};
+IncomingMail.messageQueue.entries = new Array();
+IncomingMail.messageQueue.timer = Components.classes["@mozilla.org/timer;1"].createInstance(Components.interfaces.nsITimer);
+//TODO: add to prefs
+IncomingMail.messageQueue.interval = 10000; // in ms
+IncomingMail.messageQueue.event = {
+	notify: function(timer){
+		while (IncomingMail.messageQueue.entries.length != 0){
+			console.log('new mail');
+			cryptCheck();
+		}
+		console.log('ping');
+		timer.initWithCallback(IncomingMail.messageQueue.event, 
+			IncomingMail.messageQueue.interval, Components.interfaces.nsITimer.TYPE_ONE_SHOT);
+	}
+}
+IncomingMail.messageQueue.startup = function (){
+    IncomingMail.messageQueue.event.notify(IncomingMail.messageQueue.timer);
+}
+
+IncomingMail.messageQueue.startup();
+
+
 //adapted from mailboxalert
 IncomingMail.getInterface = function (item, iff){
 	var interface = item.QueryInterface(iff);
@@ -79,21 +96,18 @@ IncomingMail.getInterface = function (item, iff){
 
 IncomingMail.filter_action =
 	{
-
-	id: "cryptcheck@point3.net#filter", // Adding a name
-	name: "CryptCheck", // Adding the name of the filter
-	//???
-	apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
+	id: "cryptcheck@point3.net#filter", 
+	name: "CryptCheck", 
+		apply: function(aMsgHdrs, aActionValue, aListener, aType, aMsgWindow)
 		{
-		console.log('something bad happened inside folderlistener');
+		console.log('log from filter action');
 		for (var i = 0; i < aMsgHdrs.length; i++)
 			{
-			var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
+				console.log('inside filter if statememt');
+				var msgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
 				if (!msgHdr.isRead)
 				{
-					console.log('log from filter action');
-					//use data from msgHdr to create the new message/alert?
-					//pass to logic determining address, encryptd, etc
+					console.log('inside filter if statememt');
 				}
 			}
 		},
@@ -111,19 +125,12 @@ IncomingMail.filter_action =
 	needsBody: false //maybe
 	};
 
-	/*
-	 * Might need to add some folder get methods here (see mailboxalert_vars.js, lines 600+). Not
-	 * sure why or how they might plug in, but it's worth noting.
-	 */
-
-console.log('CryptCheck: got here');
-
 
 IncomingMail.getFolder = function()
 {
 	try
 	{
-		var folderResource = GetFirstSelectedMsgFolder(); //do we need to define this function?
+		var folderResource = GetFirstSelectedMsgFolder(); 
 		if (folderResource){
 			var msgFolder = IncomingMail.getInterface(folderResource, Components.interfaces.nsIMsgFolder);
 			return msgFolder;
@@ -142,42 +149,28 @@ IncomingMail.FolderListener.prototype =
 	OnItemAdded: function(parentItem, item) //?
 	{
         const MSG_FOLDER_FLAG_OFFLINE = 0x8000000; //????
-        var folder = IncomingMail.getInterface(parentItem, Components.interfaces.nsIMsgFolder);
-        var message;
-        try{
+        var folder = IncomingMail.getInterface(parentItem, Components.interfaces.nsIMsgFolder);        
+        if (parentItem.name == "Inbox"){
+        	try{
+
         	item.QueryInterface(Components.interfaces.nsIMsgDBHdr, message);
-        	console.log('inside the listener -> item added');
-        	/*
-        	 * streams the message header and searches for content-type
-        	 * TODO move this into it's own function
-        	 * code courtesy of morat from mozillazine
-        	 */ 
-        	 
-        	var msgHdr = gFolderDisplay.selectedMessage;
-			var msgUri = msgHdr.folder.getUriForMsg(msgHdr);
-			var msgService = messenger.messageServiceFromURI(msgUri);
-			var scriptableInputStream = Components.classes["@mozilla.org/scriptableinputstream;1"].
-			  createInstance(Components.interfaces.nsIScriptableInputStream);
-			var syncStreamListener = Components.classes["@mozilla.org/network/sync-stream-listener;1"].
-			  createInstance(Components.interfaces.nsISyncStreamListener);
-			scriptableInputStream.init(syncStreamListener);
-			var messageUri = msgService.streamHeaders(msgUri, syncStreamListener, null /*urlListener*/);
-			var data = new String();
-			var count = scriptableInputStream.available();
-			while (count) {
-			  data = data + scriptableInputStream.read(count);
-			  count = scriptableInputStream.available();
-			}
-			scriptableInputStream.close();
-			var re = new RegExp("Content-Type: (.*)");
-			var m = data.match(re);
-			var type = m && m[1];
-			cryptCheck(type, msgHdr);//msgHdr might actually be item
+        	var incomingMsgHdr = item.QueryInterface(Components.interfaces.nsIMsgDBHdr);
+        	console.log('message id: ' + incomingMsgHdr.messageID);
+        	console.log('message key: ' + incomingMsgHdr.messageKey);
+        	console.log('thread id: ' + incomingMsgHdr.threadId);
 
+        	var newMessage = {
+        		key: incomingMsgHdr.messageKey,
+        		folder: incomingMsgHdr.folder
+        	};
 
-        } catch {
-        	console.log('something bad happened inside folderlistener');
-        }
+        	IncomingMail.messageQueue.entries.push(newMessage);
+
+       		} catch (e) {
+        	console.log ('something bad happened in the listener');
+       		console.log(e);
+       		}
+       }
 	}
 }
 
@@ -193,45 +186,77 @@ IncomingMail.onLoad = function ()
     var filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
                     .getService(Components.interfaces.nsIMsgFilterService); //idk what this does
     filterService.addCustomAction(IncomingMail.filter_action);
-    //do we have to re-add a listener here?
 }
 
-//adds folder listener
 addEventListener("load", IncomingMail.onLoad, true);
 
 
 //logic functions
-//type: regexed content-type expression
-//msgHdr: returned DBMsgHdr
-function cryptCheck(type, msgHdr) //change later: enncrypted vs unencrypted bool? or string metadata?
-	{
-			
+function cryptCheck() 
+	{ 
+		//TODO: fix hard coded company name
+		console.log('cryptcheck function');
+		var why = "";
+		//TODO: implement array of whitelisted addresses to be editable in settings. for now:
+		var whitelist = ["customersupport@point3.net", "info@point3.net"];
+		var companyDomain = "@point3.net";
+		var newMessage = IncomingMail.messageQueue.entries.pop();
+		var folder = newMessage.folder;
+		var msgHdr = folder.GetMessageHeader(newMessage.key)
+
+		if (isEncrypted(msgHdr)){
+			console.log("encrypted message recieved");
+			return false;
+		}
+		console.log("unencrypted message recieved");
+
+		if (!msgHdr.mime2DecodedAuthor.includes(companyDomain)){ 
+			return false;
+		}
+		//TODO: check w/ enigmail to see if we have recipients public key		
+		//TODO: access forward or not in header data-> make this a preference?
+		if (msgHdr.mime2DecodedSubject.includes("Fwd:")){
+			return false;
+		}
+		var i = 0;
+		while (i < whitelist.length){
+			if (msgHdr.mime2DecodedAuthor.includes(whitelist[i])){
+				return false;
+			}else{
+				i++;
+			}
+		}
+
+		//msg breaks protocol
+		composeAutoReply(msgHdr);
 	}
 
-
-/*
- *
- * most of these functions can probably use or be replaced by stdlib headerutils
- *
- */
-
-//returns boolean is encrypted or no
-//ideally, this would be the first function called from cryptcheck
-//and perform the functions currently in the message listener
 function isEncrypted(msgHdr)
 	{
-
-
+		var msgUri = msgHdr.folder.getUriForMsg(msgHdr);
+		var msgService = messenger.messageServiceFromURI(msgUri);
+		var scriptableInputStream = Components.classes["@mozilla.org/scriptableinputstream;1"].
+		  createInstance(Components.interfaces.nsIScriptableInputStream);
+		var syncStreamListener = Components.classes["@mozilla.org/network/sync-stream-listener;1"].
+		  createInstance(Components.interfaces.nsISyncStreamListener);
+		scriptableInputStream.init(syncStreamListener);
+		var messageUri = msgService.streamHeaders(msgUri, syncStreamListener, null /*urlListener*/);
+		var data = new String();
+		var count = scriptableInputStream.available();
+		while (count) {
+		  data = data + scriptableInputStream.read(count);
+		  count = scriptableInputStream.available();
+		}
+		scriptableInputStream.close();
+		var re = new RegExp("Content-Type: (.*)");
+		var m = data.match(re);
+		var type = m && m[1];
+		
+		type = type.toString();
+		console.log(type);
+		return type.includes("encrypted");
 	}
 
-//returns boolean is point3 address or no
-//TODO: for general use, figure out how to not hardcode thistt
-
-
-function addressFilter(msgHdr)
-	{
-
-	}
 
 //returns bool of whether recipient has senders public key or not
 //this should affect the message sent: aka why it broke protocol
@@ -258,9 +283,22 @@ function isForwarded(/*something*/)
 
 
  function composeAutoReply(msgHdr){
+ 	var composeParams = {};
+ 	var recipients = msgHdr.mime2DecodedRecipients;
+ 	var inSub = msgHdr.mime2DecodedSubject;
  	var composeParams;
- 	composeParams.to = msgHdr.author;
- 	composeParams.body = "This is an automatically generated email to let you know you should have encrypted your email sent to [RECIPIENT] at [TIME AND DATE]. If you think this email is a mistake, please let grace@point3.net know.";
- 	browser.beginNew(composeParams);
+ 	composeParams.to = msgHdr.mime2DecodedAuthor;
+ 	//TODO: add date and time
+ 	//TODO: make this more formal/prettier
+ 	composeParams.body = 
+ 	"This is an automatically generated nastygram to let you know you should have encrypted your email "
+ 		+ '\"' + inSub + '\"'
+ 		+ " sent to " + recipients + ". This is a security company, for Turing's sake!" 
+ 		+ '\n' + "-CryptBot"
+ 		+ '\n' + '\n' + "P.S. This is an automatically composed email sent by the Thunderbird CryptCheck extension. "
+ 		+ "If you think this email is a mistake, please let grace at point3 dot net know.";
+ //	browser.beginNew(composeParams);
+	console.log(composeParams.body);
 
  }
+ 
