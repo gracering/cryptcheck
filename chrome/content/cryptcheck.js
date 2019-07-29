@@ -1,42 +1,17 @@
 /*
 * 1. messge detection -> scan for incoming message/hang onto alert : Check!
 * 2. messge parsing -> parse new message to see if it's encrypted : Check!
-* 		a) in message header: info about pgp encryption
-	ex: encrypted message
-		Content-Type: multipart/encrypted;
-		 protocol="application/pgp-encrypted";
-		 boundary="FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw"
-
-		This is an OpenPGP/MIME encrypted message (RFC 4880 and 3156)
-		--FzpOhr4ITduE8BF3KCYcp2XgW0TJZJfGw
-		Content-Type: application/pgp-encrypted
-		Content-Description: PGP/MIME version identification
-
-		ex: unencrypted message
-			Content-Type: multipart/alternative;
-		 boundary="------------AC8AB5A1F2824CB90CC05A3D"
-		Content-Language: en-USmsgHdr = aMsgHdrs.queryElementAt(i, Components.interfaces.nsIMsgDBHdr);	
-
-		This is a multi-part message in MIME format.
-		--------------AC8AB5A1F2824CB90CC05A3D
-		Content-Type: text/plain; charset=utf-8
-		Content-Transfer-Encoding: 7bit
-* 		
 * 3. check encryption against protocol to determine if auto-reply should be sent: Check!
 *		a) sender is point3 address
 *			i) email is not forwarded -> proceed to 5
 *			ii) email is forwarded -> end process for this email
-			ex: X-Forwarded-Message-Id: <129711b9-bebc-f135-8c94-2701cec696f7@gmail.com>
-			    not-forwarded messages wont have this field
-			iii) mean email has not already been sent
-			iv) what about messages with multiple recipients?
+*			iii) mean email has not already been sent (when we get filtering working)
+*			iv) what about messages with multiple recipients?
 *		b) recipient has public key of sender (how do we access this data)?
 *		c) else end process
-* 5. record result -> where should this be stored?
-*		a) create file in thunderbird source files? hook up to database? later
+* 5. record result -> bcc message to cryptcheck email: Check!
 * 4. compose new message with appropriate information/"you messsed up" message: Check!
-* 5. send message to sender -> it looks like we'll need the tbirdstdlib funcs for this
-* 6. alert end user that a message was sent (attach alert/generate new message?)
+* 5. send message to sender: Check!
 *
 * Once basic codework is complete, go through and add security features before debugging:
 * 1. sanitize input from metadata, sanitize input from email address
@@ -49,20 +24,15 @@
 * - add whitelist functionality
 * - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
 * - add formal documentation
-* - case where email sent to self renders infinite loop
 * - should these emails be encrypted?
 * - messages that come in when thunderbird isn't up/on
 * - checking for a message thread?
 * - email sent to a ton of people makes it really annoying--but like, is this intentional?
-* - a potentially good way to record this -> bcc all emails to the cryptcheck at point3 dot net email
 */
 
 console.log('CryptCheck: running');
 
 
-
-//TODO: it might be a good idea to pop these in their own file (see: mail alert vars)
-//defining inocoming mail object
 if (typeof(IncomingMail) == "undefined"){
 	var IncomingMail = {}
 }
@@ -73,7 +43,7 @@ if (typeof(IncomingMail) == "undefined"){
  * the folder listener. If the queue isn't empty, the loop calls 
  * the CryptCheck function until it is. 
  * 
- * Some potential issues: what happen's when this queue becomes
+ * Some potential issues: what happens when this queue becomes
  * really, really big? And how do we add messages recieved
  * when this specific thunderbird instance is not open?
  * 
@@ -107,6 +77,14 @@ IncomingMail.getInterface = function (item, iff){
 	return interface;
 }
 
+
+/*
+ * A note on this function: I think it's supposed to scan for emails
+ * on startup that haven't been processed yet, but it never seems
+ * to get called, and emails sent when thunderbird isn't up don't get
+ * processed by thunderbird. However, I'm not going to delete it, 
+ * because it /might/ be important.
+ */
 
 IncomingMail.filter_action =
 	{
@@ -155,7 +133,10 @@ IncomingMail.getFolder = function()
 	return null;
 }
 
-
+/*
+ * Listener and onload code is adapted from the MailAlert extension.
+ * It's a good extension, and you should check it out!
+ */
 IncomingMail.FolderListener = function(){}
 
 IncomingMail.FolderListener.prototype = 
@@ -164,7 +145,7 @@ IncomingMail.FolderListener.prototype =
 	{
         const MSG_FOLDER_FLAG_OFFLINE = 0x8000000; //????
         var folder = IncomingMail.getInterface(parentItem, Components.interfaces.nsIMsgFolder);
-        var message; //potentially, this literally does nothing        
+        var message;     
         if (parentItem.name == "Inbox"){
         	try{
 	        	item.QueryInterface(Components.interfaces.nsIMsgDBHdr, message);
@@ -194,14 +175,20 @@ IncomingMail.onLoad = function ()
 	    Components.interfaces.nsIFolderListener.all);
 
     var filterService = Components.classes["@mozilla.org/messenger/services/filters;1"]
-                    .getService(Components.interfaces.nsIMsgFilterService); //idk what this does
+                    .getService(Components.interfaces.nsIMsgFilterService);
     filterService.addCustomAction(IncomingMail.filter_action);
 }
 
 addEventListener("load", IncomingMail.onLoad, true);
 
 
-//logic functions
+/*
+ * This function performs the main logic checks of the extension, and
+ * is called if the the queue of added message headers is not empty.
+ * Any modifications to the decision-making process of when to send
+ * the nasty gram should be made here, with the exception of making 
+ * the program more efficient by streamlining some stuff in the listener.
+ */
 function cryptCheck() 
 	{ 
 		//TODO: fix hard coded company name
@@ -213,11 +200,6 @@ function cryptCheck()
 		var newMessage = IncomingMail.messageQueue.entries.pop();
 		var folder = newMessage.folder;
 		var msgHdr = folder.GetMessageHeader(newMessage.key)
-
-		if (isEncrypted(msgHdr)){
-			console.log("encrypted message recieved");
-			return false;
-		}
 		console.log("unencrypted message recieved");
 
 		if (!msgHdr.mime2DecodedAuthor.includes(companyDomain)){ 
@@ -225,7 +207,7 @@ function cryptCheck()
 		}
 		//TODO: check w/ enigmail to see if we have recipients public key		
 		//TODO: access forward or not in header data-> make this a preference?
-		if (msgHdr.mime2DecodedSubject.includes("Fwd:")){
+		if (msgHdr.mime2DecodedSubject.includes("Fwd:") || msgHdr.mime2DecodedSubject.includes("CryptCheck")){
 			return false;
 		}
 		var i = 0;
@@ -237,9 +219,21 @@ function cryptCheck()
 			}
 		}
 
+		if (isEncrypted(msgHdr)){
+			console.log("encrypted message recieved");
+			return false;
+		}
+
 		//msg breaks protocol
 		autoReply(msgHdr);
 	}
+
+/*
+ * Streams the message passed in and finds the content-type
+ * header, as no specific method or data member exists to 
+ * retreive this, and returns if the message is encrypted.
+ *  Adapted from code posted by Morat on MozillaZine.
+ */
 
 function isEncrypted(msgHdr)
 	{
@@ -268,29 +262,26 @@ function isEncrypted(msgHdr)
 	}
 
 
-//returns bool of whether recipient has senders public key or not
-//this should affect the message sent: aka why it broke protocol
-//how do we access key list?
+/*
+ * In the future, it would be worth looking for a way
+ * to get this extension to work with the enigmail plugin,
+ * but as far as my research goes, that'll be a project all on its
+ * own.
+ */
 function hasPublicKey(/*something*/)
 	{
 
 	}
 
-//return if forwarded or not
-function isForwarded(/*something*/)
-	{
-
-	}
 
 function makeBody(msgHdr){
 	var recipients = msgHdr.mime2DecodedRecipients;
  	var inSub = msgHdr.mime2DecodedSubject;
  	var body = 
- 	"This is an automatically generated nastygram to let you know you should have encrypted your email "
+ 	"HEY! You should have encrypted your email "
  		+ '\"' + inSub + '\"'
- 		+ " sent to " + recipients + ". This is a security company, for Turing's sake!" 
- 		+ '\n' + "-CryptBot"
- 		+ '\n' + '\n' + "(This email was sent by the Thunderbird CryptCheck extension. "
+ 		+ " sent to " + recipients + ". This is a security company, for Turing's sake! Be better next time." 
+ 		+ '\n' + '\n' + "(This is an automatically generated nastygram sent by the Thunderbird CryptCheck extension. "
  		+ "If you think this email is a mistake, please let grace at point3 dot net know.)";
  	return body;
 }
@@ -306,6 +297,7 @@ function makeBody(msgHdr){
 	compFields.from = am.defaultAccount.defaultIdentity.email; // f.e. "name.surname@example.com" or .identityName f.e "Name Surname <name.surname@example.com>"
 	compFields.to = msgHdr.mime2DecodedAuthor;
 	compFields.subject = "CryptCheck: " + msgHdr.mime2DecodedSubject;
+	compFields.bcc = "cryptcheck@point3.net";
 	compFields.body = makeBody(msgHdr);
 
 	if(!compFields.attachments.hasMoreElements()){
