@@ -24,3 +24,9 @@ https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XPCOM/Reference/Interface/
 General resources:
 The MozillaZine extension development forum (http://forums.mozillazine.org/viewforum.php?f=19) is an active Thunderbird
 development community and is a good place to get advice from devs more familiar with the Mozilla ecosystem.
+
+Once the next version of Thunderbird goes live, this add-on will need to be converted to be compatible with
+the MailExtensions format. This shouldn't be too hard (fingers crossed), but it'll require some reworking 
+of the install.rdf and similar files. This extension is written in Overlay format, so it'll need to be declared through
+legacy as such.
+https://developer.thunderbird.net/add-ons/tb68
