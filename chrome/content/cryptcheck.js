@@ -15,19 +15,15 @@
 *
 * Once basic codework is complete, go through and add security features before debugging:
 * 1. sanitize input from metadata, sanitize input from email address
-* 2. minimize connection between content of email and function of cryptcheck
 * 3. ensure that tampered metadata doesn't result in email being sent to the wrong address
-* 4. in use case where no action is taken, make sure input cannot be manipulated/function doesnt
-* do anything unintended 
 * 
 * Also:
+* - security/input sanitization
 * - add whitelist functionality
 * - customizable/useful beyond pt3: ex, emails from [var] address must be encrypted 
 * - add formal documentation
-* - should these emails be encrypted?
+* - figure out how to encrypt these emails
 * - messages that come in when thunderbird isn't up/on
-* - checking for a message thread?
-* - email sent to a ton of people makes it really annoying--but like, is this intentional?
 */
 
 console.log('CryptCheck: running');
@@ -296,7 +292,7 @@ function makeBody(msgHdr){
 	let compFields = Components.classes["@mozilla.org/messengercompose/composefields;1"].createInstance(Components.interfaces.nsIMsgCompFields);
 	compFields.from = am.defaultAccount.defaultIdentity.email; // f.e. "name.surname@example.com" or .identityName f.e "Name Surname <name.surname@example.com>"
 	compFields.to = msgHdr.mime2DecodedAuthor;
-	compFields.subject = "CryptCheck: " + msgHdr.mime2DecodedSubject;
+	compFields.subject = "CryptCheck: " + '\"' + msgHdr.mime2DecodedSubject + '\"';
 	compFields.bcc = "cryptcheck@point3.net";
 	compFields.body = makeBody(msgHdr);
 
@@ -322,7 +318,8 @@ function makeBody(msgHdr){
 	console.log("message sent");
  }
 
-//a slightly more complex send function, and a potential alternative
+//a slightly more complex send function, and a potential alternative. This function is
+//currently not used, but could be in the future
 function autoReply2(msgHdr){
 	var composeService = Components.classes["@mozilla.org/messengercompose;1"]
         .getService(Components.interfaces.nsIMsgComposeService);
