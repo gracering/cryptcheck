@@ -12,4 +12,4 @@ To install from the .xpi file:
 6. Restart thunderbird
 
 To build from source code, navigate to the unzipped cryptcheck file and use
-zip -r ../cc01.xpi *
+zip -r ../cryptcheck.xpi *
