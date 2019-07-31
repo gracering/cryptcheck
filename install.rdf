@@ -3,7 +3,7 @@
 <RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
 
   <Description about="urn:mozilla:install-manifest">
-    <em:id>{8845E3B3-E8FB-40E2-95E9-EC40294818C4}</em:id>
+    <em:id>cryptcheck@point3.net</em:id>
     <em:type>2</em:type> <!-- type=extension --> 
     <em:name>cryptcheck</em:name>
     <em:version>1.0</em:version>

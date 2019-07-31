@@ -1,0 +1,36 @@
+{
+	"manifest_version": 2,
+	"applications": {
+		"gecko": {
+			"id": "cryptcheck@point3.net",
+			"strict_min_version": "60.0"
+		}
+	},
+	"name": "CryptCheck",
+	"description": "Checks that incoming mail follows encryption protocol, and sends a mean note to the sender if protocol is broken.",
+	"version": "1.0",
+	"content_security_policy": "default-src 'self'",
+	"icons":{
+		"64": "images/crypt.png",
+		"32": "images/crypt-32px.png",
+		"16": "images/crypt-16px.png"
+	},
+
+	"permissions":[
+		//"*://developer.mozilla.org/*"
+	],
+
+	"browser_action":{
+		"default_icon": "images/crypt-16px.png"
+	},
+
+	"compose_action": {
+		"default_area": "maintoolbar",
+		"default_icon": "images/crypt-16px.png",
+		"default_title": "reprimand"
+	},
+
+	"background":{
+			"scripts": ["chrome/content/cryptcheck.js"]
+	}
+}
