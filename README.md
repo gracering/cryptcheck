@@ -4,7 +4,7 @@ Thunderbird extension that checks emails for encryption protocol and notifies th
 Created by Grace Ring for Point3 Security. Almost called leetcrypt.
 
 To install from the .xpi file:
-1. Download the zip file of the latest release
+1. Download the zip file of the latest release [here](https://github.com/gracering/cryptcheck/releases)
 2. Unzip the .xpi file to desired location
 3. In Thunderbird, go to Settings->Add-Ons
 4. Click on the "Extensions" tab in the lefthand menu
@@ -12,4 +12,7 @@ To install from the .xpi file:
 6. Restart thunderbird
 
 To build from source code, navigate to the unzipped cryptcheck file and use
+
+```
 zip -r ../cryptcheck.xpi *
+```
